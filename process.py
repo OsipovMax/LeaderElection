@@ -10,8 +10,8 @@ class Process:
 
     def send_message(self, conn, queue_title, text_message):
         channel = conn.channel()
-        channel.queue_declare(queue = queue_title)
-        channel.basic_publish(exchange = '', routing_key = queue_title, body = text_message)
+        channel.queue_declare(queue=queue_title)
+        channel.basic_publish(exchange="", routing_key=queue_title, body=text_message)
         return channel
 
     def init_election(self, conn, queue_title, channel):
@@ -36,11 +36,21 @@ class Process:
         self.leader_election(conn, channel, queue_title)
 
     def recv_message(self, conn, channel, queue_title):
-        for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
+        for _, _, body in channel.consume(
+            queue=queue_title, auto_ack=True, inactivity_timeout=3
+        ):
             if body is not None:
-                print("I am a process with ID = {0}. I got a message : {1}".format(self.process_id,body.decode('utf-8')))
+                print(
+                    "I am a process with ID = {0}. I got a message : {1}".format(
+                        self.process_id, body.decode("utf-8")
+                    )
+                )
             else:
-                print("I am a process with ID = {0}. The message is not received (timeout)".format(self.process_id))
+                print(
+                    "I am a process with ID = {0}. The message is not received (timeout)".format(
+                        self.process_id
+                    )
+                )
 
             if self.prev_nb == self.leader_id:
                 if body is not None:
@@ -49,7 +59,9 @@ class Process:
                     self.init_election(conn, queue_title, channel)
                     return None
             elif self.process_id != self.leader_id:
-                for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
+                for _, _, body in channel.consume(
+                    queue=queue_title, auto_ack=True, inactivity_timeout=3
+                ):
                     if body == b"Ok":
                         channel.cancel()
                     elif body == b"Election":
@@ -64,35 +76,53 @@ class Process:
         tmp_buf = []
         self.topology.remove(self.leader_id)
         if self.is_initiator_election:
-            print("I am initiator of election and I propose my candidacy, my id = {0}.".format(self.process_id))
+            print(
+                "I am initiator of election and I propose my candidacy, my id = {0}.".format(
+                    self.process_id
+                )
+            )
             self.election_buffer.append(self.process_id)
             self.send_message(conn, str(self.next_nb), bytes(self.election_buffer))
-            for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
+            for _, _, body in channel.consume(
+                queue=queue_title, auto_ack=True, inactivity_timeout=3
+            ):
                 tmp_buf = list(body)
                 self.election_buffer = tmp_buf
                 channel.cancel()
-            print("OK, I have collected all the candidates, and now I will choose the best one.")
+            print(
+                "OK, I have collected all the candidates, and now I will choose the best one."
+            )
             new_leader = max(self.election_buffer)
             print("Leader it is a process with id = {0}.".format(new_leader))
             self.send_message(conn, str(self.next_nb), str(new_leader))
             self.leader_id = new_leader
             self.is_initiator_election = False
-            for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
+            for _, _, body in channel.consume(
+                queue=queue_title, auto_ack=True, inactivity_timeout=3
+            ):
                 print("OK, the leader is updated for all processes.")
                 channel.cancel()
         else:
-            for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
+            for _, _, body in channel.consume(
+                queue=queue_title, auto_ack=True, inactivity_timeout=3
+            ):
                 tmp_buf = list(body)
                 self.election_buffer = tmp_buf
-                print("I also propose my candidacy, my id = {0}".format(self.process_id))
+                print(
+                    "I also propose my candidacy, my id = {0}".format(self.process_id)
+                )
                 self.election_buffer.append(self.process_id)
                 channel.cancel()
             self.send_message(conn, str(self.next_nb), bytes(self.election_buffer))
-            for _, _, body in channel.consume(queue = queue_title, auto_ack = True, inactivity_timeout = 3):
-                self.leader_id = int(body.decode('utf-8'))
+            for _, _, body in channel.consume(
+                queue=queue_title, auto_ack=True, inactivity_timeout=3
+            ):
+                self.leader_id = int(body.decode("utf-8"))
                 channel.cancel()
             self.send_message(conn, str(self.next_nb), str(self.leader_id))
         self.election_buffer = []
-        
+
     def __repr__(self):
-        return "Process id = {0}, Prev nb = {1}, Next nb = {2}".format(self.process_id, self.prev_nb, self.next_nb)
+        return "Process id = {0}, Prev nb = {1}, Next nb = {2}".format(
+            self.process_id, self.prev_nb, self.next_nb
+        )

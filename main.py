@@ -11,17 +11,18 @@ num_work_circle = 1
 # glob var for modeling distributed work
 mutex = threading.Lock()
 shared_variable = 0
-   
+
+
 def process_work(process: Process) -> None:
     global shared_variable
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
     standard_work = True
     while len(process.topology) > 2:
-        # normal work of distributed system 
+        # normal work of distributed system
         if standard_work:
             mutex.acquire()
             if shared_variable == process_count * num_work_circle:
-                #normal work in the distributed system is finished
+                # normal work in the distributed system is finished
                 standard_work = False
             else:
                 shared_variable += 1
@@ -30,13 +31,22 @@ def process_work(process: Process) -> None:
             print("i am a process with ID = {0} and failed.".format(process.process_id))
             connection.close()
             return None
-        connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
-        channel = process.send_message(connection, str(process.next_nb), "I am process with ID = {0}, and I'm your neighbor.".format(process.process_id)) 
+        connection = pika.BlockingConnection(
+            pika.ConnectionParameters(host="localhost")
+        )
+        channel = process.send_message(
+            connection,
+            str(process.next_nb),
+            "I am process with ID = {0}, and I'm your neighbor.".format(
+                process.process_id
+            ),
+        )
         process.recv_message(connection, channel, str(process.process_id))
     connection.close()
 
+
 if __name__ == "__main__":
-    threads = [] 
+    threads = []
     topo = creat_ring_topo(process_count)
     print(topo)
     for process in topo:
@@ -46,7 +56,7 @@ if __name__ == "__main__":
         trd.start()
     for tread in threads:
         tread.join()
-    connection = pika.BlockingConnection(pika.ConnectionParameters(host='localhost'))
+    connection = pika.BlockingConnection(pika.ConnectionParameters(host="localhost"))
     channel = connection.channel()
     for i in range(process_count):
         channel.queue_purge(queue=str(i))
